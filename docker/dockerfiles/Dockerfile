@@ -1,0 +1,685 @@
+########################################################################################################
+## OptiMIN - corpus minimization tool
+########################################################################################################
+
+FROM ubuntu:20.04 AS optimin
+
+RUN export DEBIAN_FRONTEND=noninteractive &&    \
+    apt update &&                               \
+    apt install -y \
+    git \
+    build-essential \
+    cmake \
+    libboost-container-dev \
+    libz-dev \
+    python3 \
+    git
+
+RUN git clone https://github.com/HexHive/fuzzing-seed-selection.git /fuzzing-seed-selection
+RUN git clone https://github.com/FlorentAvellaneda/EvalMaxSAT /EvalMaxSAT
+WORKDIR /fuzzing-seed-selection/optimin/build
+RUN cmake ../ && \
+    make -j
+WORKDIR /EvalMaxSAT/build
+RUN cmake ../ && \
+    make -j
+
+WORKDIR /optimin/
+RUN cp /EvalMaxSAT/build/EvalMaxSAT_bin /optimin/
+RUN cp /fuzzing-seed-selection/optimin/build/src/afl-showmap-maxsat /optimin/
+RUN cp /fuzzing-seed-selection/optimin/optimin.py /optimin/
+
+
+########################################################################################################
+## AFL++ Builder base -- gets AFL++ and build dependencies and gets it ready to compile.
+########################################################################################################
+FROM debian:bullseye@sha256:4d6ab716de467aad58e91b1b720f0badd7478847ec7a18f66027d0f8a329a43c AS aflplusplus-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -y && \
+    apt-get install -y \
+    build-essential \
+    python3-dev \
+    automake \
+    git \
+    flex \
+    bison \
+    libglib2.0-dev \
+    libpixman-1-dev \
+    python3-setuptools \
+    ninja-build
+
+# - Gcc/Clang
+RUN apt-get update -y && \
+    apt-get install -y \
+    lsb-release \
+    wget \
+    software-properties-common
+
+# Install LLVM-13
+WORKDIR /llvm
+RUN wget https://apt.llvm.org/llvm.sh && \
+    chmod +x llvm.sh && \
+    ./llvm.sh 13
+RUN update-alternatives --install /usr/bin/clang++ clang++ $(which clang++-13) 100 \
+    && update-alternatives --install /usr/bin/clang clang $(which clang-13) 100 \
+    && update-alternatives --install /usr/bin/llvm-config llvm-config $(which llvm-config-13) 100
+
+RUN apt-get update -y && \
+    apt-get install -y gcc-9 \
+    g++-9 \
+    gcc-9-plugin-dev \
+    libstdc++-9-dev
+
+RUN update-alternatives --install /usr/bin/gcc gcc $(which gcc-9) 100 \
+    && update-alternatives --install /usr/bin/g++ g++ $(which g++-9) 100
+
+RUN bash -c 'git clone --recurse-submodules -j`nproc` https://github.com/AFLplusplus/AFLplusplus /AFLplusplus'
+WORKDIR /AFLplusplus
+RUN git fetch --all
+RUN git checkout 1d4f1e48797c064ee71441ba555b29fc3f467983
+COPY docker/scripts/copyafl.sh /copyafl.sh
+COPY --from=optimin /optimin/ /optimin/
+
+########################################################################################################
+## AFL++ per-architecture target compile targets, which will output AFL++ binaries to
+## the /output directory so further build steps can run COPY --from=aflplusplus-builder-x86_64 /output
+########################################################################################################
+
+FROM aflplusplus-builder AS aflplusplus-builder-aarch64-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=aarch64-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-alpha-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=alpha-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-arm-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=arm-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-avr-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=avr-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-cris-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=cris-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-hppa-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=hppa-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-i386-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=i386-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-m68k-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=m68k-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-microblaze-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=microblaze-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-microblazeel-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=microblazeel-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mips-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=mips-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mips64-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=mips64-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mips64el-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=mips64el-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mipsel-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=mipsel-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-moxie-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=moxie-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-nios2-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=nios2-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-or1k-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=or1k-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-ppc-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=ppc-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-ppc64-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=ppc64-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-riscv32-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=riscv32-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-riscv64-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=riscv64-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-rx-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=rx-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-s390x-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=s390x-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sh4-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=sh4-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sh4eb-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=sh4eb-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sparc-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=sparc-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sparc64-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=sparc64-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-tricore-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=tricore-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-x86_64-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=x86_64-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-xtensa-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=xtensa-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-xtensaeb-softmmu
+ENV STATIC=1
+ENV CPU_TARGET=xtensaeb-softmmu
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-aarch64
+ENV STATIC=1
+ENV CPU_TARGET=aarch64
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-aarch64_be
+ENV STATIC=1
+ENV CPU_TARGET=aarch64_be
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-alpha
+ENV STATIC=1
+ENV CPU_TARGET=alpha
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-arm
+ENV STATIC=1
+ENV CPU_TARGET=arm
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-armeb
+ENV STATIC=1
+ENV CPU_TARGET=armeb
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-cris
+ENV STATIC=1
+ENV CPU_TARGET=cris
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-hexagon
+ENV STATIC=1
+ENV CPU_TARGET=hexagon
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-hppa
+ENV STATIC=1
+ENV CPU_TARGET=hppa
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-i386
+ENV STATIC=1
+ENV CPU_TARGET=i386
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-m68k
+ENV STATIC=1
+ENV CPU_TARGET=m68k
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-microblaze
+ENV STATIC=1
+ENV CPU_TARGET=microblaze
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-microblazeel
+ENV STATIC=1
+ENV CPU_TARGET=microblazeel
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mips
+ENV STATIC=1
+ENV CPU_TARGET=mips
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mips64
+ENV STATIC=1
+ENV CPU_TARGET=mips64
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mips64el
+ENV STATIC=1
+ENV CPU_TARGET=mips64el
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mipsel
+ENV STATIC=1
+ENV CPU_TARGET=mipsel
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mipsn32
+ENV STATIC=1
+ENV CPU_TARGET=mipsn32
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-mipsn32el
+ENV STATIC=1
+ENV CPU_TARGET=mipsn32el
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-nios2
+ENV STATIC=1
+ENV CPU_TARGET=nios2
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-or1k
+ENV STATIC=1
+ENV CPU_TARGET=or1k
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-ppc
+ENV STATIC=1
+ENV CPU_TARGET=ppc
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-ppc64
+ENV STATIC=1
+ENV CPU_TARGET=ppc64
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-ppc64le
+ENV STATIC=1
+ENV CPU_TARGET=ppc64le
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-riscv32
+ENV STATIC=1
+ENV CPU_TARGET=riscv32
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-riscv64
+ENV STATIC=1
+ENV CPU_TARGET=riscv64
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-s390x
+ENV STATIC=1
+ENV CPU_TARGET=s390x
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sh4
+ENV STATIC=1
+ENV CPU_TARGET=sh4
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sh4eb
+ENV STATIC=1
+ENV CPU_TARGET=sh4eb
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sparc
+ENV STATIC=1
+ENV CPU_TARGET=sparc
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sparc32plus
+ENV STATIC=1
+ENV CPU_TARGET=sparc32plus
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-sparc64
+ENV STATIC=1
+ENV CPU_TARGET=sparc64
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-x86_64
+ENV STATIC=1
+ENV CPU_TARGET=x86_64
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-xtensa
+ENV STATIC=1
+ENV CPU_TARGET=xtensa
+RUN make distrib
+RUN /copyafl.sh /output/
+
+FROM aflplusplus-builder AS aflplusplus-builder-xtensaeb
+ENV STATIC=1
+ENV CPU_TARGET=xtensaeb
+RUN make distrib
+RUN /copyafl.sh /output/
+
+# The below is from symcc, see license in third_party/symcc-LICENSE
+FROM ubuntu:20.04 AS symqemu-builder-deps
+
+# Install dependencies
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        cargo \
+        clang-10 \
+        cmake \
+        g++ \
+        git \
+        libz3-dev \
+        llvm-10-dev \
+        llvm-10-tools \
+        ninja-build \
+        python2 \
+        python3-pip \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip3 install lit
+
+# Build AFL.
+RUN git clone -b v2.56b https://github.com/google/AFL.git afl \
+    && cd afl \
+    && make
+
+# Download the LLVM sources already so that we don't need to get them again when
+# SymCC changes
+RUN git clone -b llvmorg-10.0.1 --depth 1 https://github.com/llvm/llvm-project.git /llvm_source
+
+# Build a version of SymCC with the simple backend to compile libc++
+RUN git clone https://github.com/novafacing/symcc.git /symcc_source
+
+# Init submodules if they are not initialiazed yet
+WORKDIR /symcc_source
+RUN if git submodule status | grep "^-">/dev/null ; then \
+    echo "Initializing submodules"; \
+    git submodule init; \
+    git submodule update; \
+    fi
+
+WORKDIR /symcc_build_simple
+RUN cmake -G Ninja \
+        -DQSYM_BACKEND=OFF \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DZ3_TRUST_SYSTEM_VERSION=on \
+        /symcc_source \
+    && ninja check
+
+WORKDIR /libcxx_symcc
+RUN export SYMCC_REGULAR_LIBCXX=yes SYMCC_NO_SYMBOLIC_INPUT=yes \
+  && mkdir /libcxx_symcc_build \
+  && cd /libcxx_symcc_build \
+  && cmake -G Ninja /llvm_source/llvm \
+  -DLLVM_ENABLE_PROJECTS="libcxx;libcxxabi" \
+  -DLLVM_TARGETS_TO_BUILD="X86" \
+  -DLLVM_DISTRIBUTION_COMPONENTS="cxx;cxxabi;cxx-headers" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=/libcxx_symcc_install \
+  -DCMAKE_C_COMPILER=/symcc_build_simple/symcc \
+  -DCMAKE_CXX_COMPILER=/symcc_build_simple/sym++ \
+  && ninja distribution \
+  && ninja install-distribution
+
+WORKDIR /symcc_build
+RUN cmake -G Ninja \
+        -DQSYM_BACKEND=ON \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DZ3_TRUST_SYSTEM_VERSION=on \
+        /symcc_source \
+    && ninja check \
+    && cargo install --path /symcc_source/util/symcc_fuzzing_helper
+
+# Build SymQemu
+RUN cp /etc/apt/sources.list /etc/apt/sources.list~ && \
+    sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list && \
+    apt update
+RUN apt build-dep -y qemu
+RUN git clone https://github.com/eurecom-s3/symqemu.git /symqemu_source
+WORKDIR /symqemu_build
+RUN /symqemu_source/configure                                     \
+      --audio-drv-list=                                           \
+      --disable-bluez                                             \
+      --disable-sdl                                               \
+      --disable-gtk                                               \
+      --disable-vte                                               \
+      --disable-opengl                                            \
+      --disable-virglrenderer                                     \
+      --target-list=x86_64-linux-user                             \
+      --enable-capstone=git                                       \
+      --symcc-source=/symcc_source                                \
+      --symcc-build=/symcc_build                                  \
+    && make -j 15
+
+
+FROM ubuntu:20.04 AS symqemu
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential \
+        clang-10 \
+        g++ \
+        libllvm10 \
+        zlib1g \
+        sudo \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -s /bin/bash ubuntu \
+    && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu
+
+COPY --from=symqemu-builder-deps /symcc_build /symcc_build
+COPY --from=symqemu-builder-deps /symqemu_build /symqemu_build_
+COPY --from=symqemu-builder-deps /root/.cargo/bin/symcc_fuzzing_helper /symcc_build/
+COPY --from=symqemu-builder-deps /symcc_source/util/pure_concolic_execution.sh /symcc_build/
+COPY --from=symqemu-builder-deps /libcxx_symcc_install /libcxx_symcc_install
+COPY --from=symqemu-builder-deps /afl /afl
+
+ENV PATH /symcc_build:$PATH
+ENV AFL_PATH /afl
+ENV AFL_CC clang-10
+ENV AFL_CXX clang++-10
+ENV SYMCC_LIBCXX_PATH=/libcxx_symcc_install
+
+USER ubuntu
+WORKDIR /home/ubuntu
+RUN mkdir /tmp/output
+
+FROM ubuntu:16.04 AS tfuzz-builder
+SHELL ["/bin/bash", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONIOENCODING=utf8 \
+    LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8
+
+RUN sed -i 's/# deb-src/deb-src/g' /etc/apt/sources.list
+RUN apt-get -y update && \
+    apt-get build-dep -y qemu-system \
+    apt-get install -y \
+    autoconf \
+    automake \
+    bison \
+    build-essential \
+    clang \
+    cmake \
+    curl \
+    debian-archive-keyring \
+    debootstrap \
+    flex \
+    gcc-multilib \
+    git \
+    git \
+    libacl1-dev \
+    libexpat1-dev \
+    libtool \
+    libtool-bin \
+    llvm-dev \
+    pkg-config \
+    python3 \
+    python3-pip \
+    python3-virtualenv \
+    software-properties-common \
+    unzip \
+    wget \
+    zlib1g-dev
+
+
+RUN git clone https://github.com/radare/radare2.git /radare2
+RUN git clone https://github.com/HexHive/T-Fuzz /T-Fuzz
+RUN git clone https://github.com/shellphish/shellphish-afl /shellphish-afl
+
+WORKDIR /shellphish-afl
+RUN sed -i 's#"aarch64", "x86_64", "i386", "arm", "ppc", "ppc64", "mips", "mipsel", "mips64"#"x86_64", "i386"#' setup.py &&\
+    sed -i 's/fetcharch armhf ubuntu trusty/#fetcharch armhf ubuntu trusty/' fetchlibs.sh &&\
+    sed -i 's/fetcharch armel debian jessie/#fetcharch armel debian jessie/' fetchlibs.sh &&\
+    sed -i 's/fetcharch powerpc ubuntu trusty/#fetcharch powerpc ubuntu trusty/' fetchlibs.sh &&\
+    sed -i 's/fetcharch mips debian jessie/#fetcharch mips debian jessie/' fetchlibs.sh &&\
+    sed -i 's/fetcharch mipsel debian jessie/#fetcharch mipsel debian jessie/' fetchlibs.sh &&\
+    python3 setup.py build &&\
+    python3 setup.py install
+
+RUN python3 -m pip install -U pip &&\
+    python3 -m pip install -U git+https://github.com/shellphish/fuzzer &&\
+    python3 -m pip install -U git+https://github.com/shellphish/driller &&\
+    python3 -m pip install -U git+https://github.com/angr/tracer &&\
+    cp -R -v /shellphish-afl/bin/afl-unix /usr/bin/
+
+COPY docker/resources/shellphuzz /usr/local/bin/shellphuzz
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
+
+RUN sed -i 's/if not "core" in f.read():/if f.read().startswith("|"):/' /usr/local/lib/python3.5/dist-packages/fuzzer/fuzzer.py
+
+WORKDIR /T-Fuzz
+RUN python3 -m pip install -U pip &&\
+    cd T-Fuzz && sed -i 's/shellphish-afl==1.1//g' req.txt &&\
+    python3 -m pip install -r req.txt &&\
+    python3 -m pip install -U git+https://github.com/shellphish/fuzzer.git
+
+COPY docker/resources/create_dict.py /usr/local/bin/create_dict.py
+COPY docker/resources/tfuzz_sys.py /T-Fuzz/tfuzz/tfuzz_sys.py
+COPY docker/resources/issue14.patch /T-Fuzz/issue14.patch
+RUN git apply issue14.patch
+
+RUN sed -i 's/if not "core" in f.read():/if f.read().startswith("|"):/' /usr/local/lib/python2.7/dist-packages/fuzzer/fuzzer.py
+
+
+

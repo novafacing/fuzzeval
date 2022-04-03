@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  afl_plusplus:
+    build:
+      target: aflplusplus-builder-x86_64
+      dockerfile: ./docker/dockerfiles/Dockerfile
+      context: ..
+  symqemu:
+    build:
+      target: symqemu
+      dockerfile: ./docker/dockerfiles/Dockerfile
+      context: ..
