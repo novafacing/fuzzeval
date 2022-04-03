@@ -14,6 +14,11 @@ these subdirectories should contain a `build.sh` script that will build each bin
 in the dataset and copy the set of build artifacts (the binary and any dependencies) to
 [`corpus/build/the_dataset_name/the_testcase_name/`](corpus/build).
 
+The `build.sh` script should also generate a directory 
+`corpus/build/the_dataset_name/the_testcase_name/seeds/` with a subdirectory for each
+seed set, so if you want to test it with a given set of seeds and with the empty seed,
+you should have two directories called `good` and `empty` (for example).
+
 ## Fuzzers
 
 Fuzzeval provides builds of `AFL++`, `SymQEMU`, and `T-Fuzz` for a thorough comparison
@@ -50,3 +55,5 @@ failures in depth.
 ## Notes
 
 * Unintended CGC bugs: https://github.com/mfthomps/CGC-Analysis
+* AFLplusplus can be run with the wrapper with the given configuration with:
+  `python3 /scripts/aflplusplus_wrapper.py -t 1440 -a $(pwd)/afl-fuzz -s /corpus/test_fuzzers_work/AIS-Lite/seeds/ -o /output /corpus/test_fuzzers_work/AIS-Lite/AIS-Lite`
