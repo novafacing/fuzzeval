@@ -17,4 +17,4 @@ services:
       context: ..
     command: bash -c 'cp -a /corpus/build/* /build/'
     volumes:
-      - ./corpus/build:/build
+      - ../corpus/build:/build

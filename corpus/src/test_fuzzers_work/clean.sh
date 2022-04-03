@@ -2,4 +2,4 @@
 
 set -e
 
-git clean -d -f .
+git clean -dfx .

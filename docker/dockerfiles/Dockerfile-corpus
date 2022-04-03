@@ -5,15 +5,29 @@ FROM ubuntu:20.04 AS corpus-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+SHELL ["/bin/bash", "-c"]
+
 RUN apt-get update -y && \
     apt-get install -y \
-    build-essential \
     automake \
-    git \
-    flex \
+    bash \
     bison \
-    cmake \
-    bash
+    build-essential \
+    coreutils \
+    flex \
+    git \
+    gpg \
+    lsb-release \
+    software-properties-common \
+    wget
+
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+    | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg
+
+RUN apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
+
+RUN apt-get update -y && \
+    apt-get -y install cmake
 
 COPY corpus /corpus
 WORKDIR /corpus

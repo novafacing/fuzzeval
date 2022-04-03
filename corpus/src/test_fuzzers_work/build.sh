@@ -2,12 +2,18 @@
 
 set -e
 
-OUTDIR=../../../build/
+OUTDIR=../../../../build/AIS-Lite/
 
 pushd AIS-Lite
-cmake -DCMAKE_EXE_LINKER_FLAGS='-no-pie -fno-pie -static' -DBUILD_STATIC_LIBS=ON .
+if [ -d "build" ]; then
+    rm -rf build
+fi
+mkdir -p build
+pushd build
+cmake -DCMAKE_EXE_LINKER_FLAGS='-no-pie -fno-pie -static' -DBUILD_STATIC_LIBS=ON ..
 make
 mkdir -p "${OUTDIR}"
-cp AIS-Lite/AIS-Lite "${OUTDIR}"
+cp AIS-Lite "${OUTDIR}"
+popd
 
 popd
