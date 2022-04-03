@@ -1,1 +1,5 @@
-add_library(tiny-AES128-C aes.c)
+if (BUIlD_STATIC_LIBS)
+    add_library(tiny-AES128-C STATIC aes.c)
+else(BUILD_STATIC_LIBS)
+    add_library(tiny-AES128-C aes.c)
+endif(BUILD_STATIC_LIBS)

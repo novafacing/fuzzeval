@@ -1,5 +1,9 @@
 file(GLOB srcs *.c)
-add_library(pov ${srcs})
+if(BUILD_STATIC_LIBS)
+    add_library(pov STATIC ${srcs})
+else(BUILD_STATIC_LIBS)
+    add_library(pov ${srcs})
+endif(BUIlD_STATIC_LIBS)
 
 target_compile_definitions(pov PUBLIC -DNPATCHED)
 if(NOT WIN32)
