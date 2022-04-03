@@ -1,0 +1,20 @@
+########################################################################################################
+## Corpus builder for reface evaluation data
+########################################################################################################
+FROM ubuntu:20.04 AS corpus-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -y && \
+    apt-get install -y \
+    build-essential \
+    automake \
+    git \
+    flex \
+    bison \
+    cmake \
+    bash
+
+COPY corpus /corpus
+WORKDIR /corpus
+RUN ./build.sh

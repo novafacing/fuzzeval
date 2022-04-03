@@ -4,6 +4,16 @@ Docker configurations and setup for large-scale fuzzing for evaluation of fuzzin
 as described in Klees et. al "Evaluating Fuzz Testing" (given in
 [docs](docs/evaluating_fuzz_testing.pdf)).
 
+## Corpus
+
+The corpus is composed of the CGC dataset and the LAVA-M dataset, and the corpus
+should be built directly from the [corpus directory](corpus) as follows.
+
+[`corpus/src`](corpus/src) should contain one subdirectory per input dataset. Each of
+these subdirectories should contain a `build.sh` script that will build each binary
+in the dataset and copy the set of build artifacts (the binary and any dependencies) to
+[`corpus/build/the_dataset_name/the_testcase_name/`](corpus/build).
+
 ## Fuzzers
 
 Fuzzeval provides builds of `AFL++`, `SymQEMU`, and `T-Fuzz` for a thorough comparison
@@ -36,3 +46,7 @@ We use coverage as a secondary metric, as this is particularly relevant for our 
 
 We evaluate over a large set of binaries, and therefore are not able to debug specific
 failures in depth.
+
+## Notes
+
+* Unintended CGC bugs: https://github.com/mfthomps/CGC-Analysis

@@ -3,10 +3,18 @@ services:
   afl_plusplus:
     build:
       target: aflplusplus-builder-x86_64
-      dockerfile: ./docker/dockerfiles/Dockerfile
+      dockerfile: ./docker/dockerfiles/Dockerfile-fuzzers
       context: ..
   symqemu:
     build:
       target: symqemu
-      dockerfile: ./docker/dockerfiles/Dockerfile
+      dockerfile: ./docker/dockerfiles/Dockerfile-fuzzers
       context: ..
+  corpus:
+    build:
+      target: corpus-builder
+      dockerfile: ./docker/dockerfiles/Dockerfile-corpus
+      context: ..
+    command: bash -c 'cp -a /corpus/build/* /build/'
+    volumes:
+      - ./corpus/build:/build

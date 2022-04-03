@@ -100,3 +100,6 @@ dkms.conf
 *.exe
 *.out
 *.app
+
+# Built corpus
+corpus/build/*
