@@ -35,7 +35,7 @@ class TimecardPollGenerator(Actions):
         for each in range(0, self.NUMBER_OF_EMPLOYEES):
             self.state['employees'].append(Employee())
         # Generate a random list of employee id's from 1 to 10 elements long. The generator will create inputs for those employees only.
-        self.state['id_subset'] = random.sample(range(0,self.NUMBER_OF_EMPLOYEES), random.randint(1,10))
+        self.state['id_subset'] = random.sample(list(range(0,self.NUMBER_OF_EMPLOYEES)), random.randint(1,10))
 
         testlib = ctypes.CDLL('../../build/challenges/payroll/libCROMU_00007.so')
         self.standardpay = testlib.cgc_c_standardpay
