@@ -19,7 +19,12 @@ RUN apt-get update -y && \
     gpg \
     lsb-release \
     software-properties-common \
-    wget
+    wget \
+    python3 \
+    python3-pip \
+    python3-yaml
+
+RUN python3 -m pip install pycryptodome matplotlib numpy 
 
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
     | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg
@@ -29,6 +34,7 @@ RUN apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) m
 RUN apt-get update -y && \
     apt-get -y install cmake
 
+COPY scripts /scripts
 COPY corpus /corpus
 WORKDIR /corpus
 RUN ./build.sh
