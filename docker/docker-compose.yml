@@ -19,6 +19,14 @@ services:
     volumes:
       - ../corpus/build:/corpus
 
+  tfuzz:
+    build:
+      target: tfuzz
+      dockerfile: ./docker/dockerfiles/Dockerfile-fuzzers
+      context: ..
+    volumes:
+      - ../corpus/build:/corpus
+
   corpus:
     build:
       target: corpus-builder
