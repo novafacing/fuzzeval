@@ -2,9 +2,6 @@
 
 set -e
 
-pushd /scripts/cgc-generate-polls/
-./generate_all.sh "/corpus/src/cgc/"
-popd
 
 for f in *; do
     if [ -d "${f}" ]; then
@@ -18,10 +15,12 @@ for f in *; do
         pushd build
         cmake -DCMAKE_EXE_LINKER_FLAGS='-no-pie -fno-pie' ..
         make
-        mkdir -p "${OUTDIR}/seeds/"
-        cp "${f}" "${OUTDIR}/${f}"
+        mkdir -p "${OUTDIR}/seeds/good"
+        mkdir -p "${OUTDIR}/seeds/empty"
+        touch "${OUTDIR}/seeds/empty/empty"
+        cp "${f}"* "${OUTDIR}/"
         find . -type f -name '*.so' -exec cp '{}' "${OUTDIR}/" \;
-        cp -a ../seeds/* "${OUTDIR}/seeds/"
+        # cp -a ../seeds/* "${OUTDIR}/seeds/"
         popd
         popd
     fi

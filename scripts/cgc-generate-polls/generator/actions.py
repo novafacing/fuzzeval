@@ -22,7 +22,7 @@
 #
 
 import sys
-from . import ansi_x931_aes128
+import ansi_x931_aes128
 import random
 import string
 

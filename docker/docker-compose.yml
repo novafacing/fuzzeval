@@ -35,3 +35,4 @@ services:
     command: bash -c 'cp -a /corpus/build/* /build/'
     volumes:
       - ../corpus/build:/build
+      - ../scripts/:/scripts/

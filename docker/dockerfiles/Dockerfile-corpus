@@ -9,6 +9,11 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update -y && \
     apt-get install -y \
+    software-properties-common && \
+    add-apt-repository universe
+
+RUN apt-get update -y && \
+    apt-get install -y \
     automake \
     bash \
     bison \
@@ -18,13 +23,13 @@ RUN apt-get update -y && \
     git \
     gpg \
     lsb-release \
-    software-properties-common \
     wget \
-    python3 \
-    python3-pip \
-    python3-yaml
+    curl \
+    python2
 
-RUN python3 -m pip install pycryptodome matplotlib numpy 
+RUN curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output /get-pip.py && \
+    python2 /get-pip.py && \
+    pip2 install pycryptodome matplotlib numpy pyyaml
 
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
     | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg
@@ -34,7 +39,8 @@ RUN apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) m
 RUN apt-get update -y && \
     apt-get -y install cmake
 
-COPY scripts /scripts
 COPY corpus /corpus
 WORKDIR /corpus
 RUN ./build.sh
+COPY scripts /scripts
+RUN ./extra.sh
