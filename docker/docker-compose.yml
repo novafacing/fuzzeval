@@ -32,7 +32,7 @@ services:
       target: corpus-builder
       dockerfile: ./docker/dockerfiles/Dockerfile-corpus
       context: ..
-    command: bash -c 'cp -a /corpus/build/* /build/'
+    command: bash -c '/corpus/build.sh'
     volumes:
-      - ../corpus/build:/build
+      - ../corpus:/corpus
       - ../scripts/:/scripts/

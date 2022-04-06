@@ -31,6 +31,8 @@ import random
 import yaml
 import struct
 import zipfile
+from xml.etree import ElementTree
+from codecs import escape_decode
 
 from generator.actions import Actions
 from generator.graph import Graph
@@ -256,13 +258,18 @@ def main():
             current_id += 1
 
         for i, xml in enumerate(polls):
-            filename = 'GEN_%05d_%05d.xml' % (round_id, i)
-    
-            if package_fh is not None:
-                package_fh.writestr(filename, xml)
-            else:
-                with open(os.path.join(args.output, filename), 'w') as xml_fh:
-                    xml_fh.write(xml)
+            filename = 'GEN_%05d_%05d.raw' % (round_id, i)
+
+            tree = ElementTree.ElementTree(ElementTree.fromstring(xml))
+
+            writes = list(map(lambda w: w.find("data").text, tree.iter(tag="write")))
+            raw_contents = ""
+            for w in writes:
+                raw_contents += escape_decode(w)
+
+
+            with open(os.path.join(args.output, filename), 'w') as xml_fh:
+                xml_fh.write(raw_contents)
 
     if package_fh is not None:
         package_fh.close()

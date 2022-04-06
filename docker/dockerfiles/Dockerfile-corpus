@@ -38,9 +38,3 @@ RUN apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) m
 
 RUN apt-get update -y && \
     apt-get -y install cmake
-
-COPY corpus /corpus
-WORKDIR /corpus
-RUN ./build.sh
-COPY scripts /scripts
-RUN ./extra.sh
