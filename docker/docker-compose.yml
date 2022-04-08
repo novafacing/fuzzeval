@@ -5,7 +5,7 @@ services:
       target: aflplusplus-corpus
       dockerfile: ./docker/dockerfiles/Dockerfile-fuzzers
       context: ..
-    command: python3 /scripts/aflplusplus_wrapper.py -t 1 -a /AFLplusplus/afl-fuzz -s /corpus/cgc/AIS-Lite/seeds/ -o /results/ -- /corpus/cgc/AIS-Lite/AIS-Lite
+    command: python3 /scripts/aflplusplus_wrapper.py -t 1 -a /AFLplusplus/afl-fuzz -s /corpus/test_fuzzers_work/AIS-Lite/seeds/ -o /results/ -- /corpus/test_fuzzers_work/AIS-Lite/AIS-Lite
     privileged: true
     volumes:
       - ../corpus/build:/corpus
@@ -37,7 +37,7 @@ services:
       target: corpus-builder
       dockerfile: ./docker/dockerfiles/Dockerfile-corpus
       context: ..
-    command: bash -c '/corpus/build.sh'
+    command: bash -c '/corpus/build.sh; /corpus/extra.sh'
     volumes:
       - ../corpus:/corpus
       - ../scripts/:/scripts/

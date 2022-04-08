@@ -265,7 +265,7 @@ def main():
             writes = list(map(lambda w: w.find("data").text, tree.iter(tag="write")))
             raw_contents = ""
             for w in writes:
-                raw_contents += escape_decode(w)
+                raw_contents += escape_decode(w)[0]
 
 
             with open(os.path.join(args.output, filename), 'w') as xml_fh:

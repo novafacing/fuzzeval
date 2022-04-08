@@ -2,8 +2,8 @@
 
 set -e
 
-pushd src
-for f in *; do
+pushd /corpus/src
+for f in "test_fuzzers_work"; do # "cgc"; do
     if [ -d "${f}" ]; then
         pushd "${f}"
         echo "Running extra script on $(pwd)"
