@@ -6,7 +6,7 @@ from datetime import datetime
 from os import getenv
 from random import randint
 from re import search
-from shutil import rmtree
+from shutil import copyfile, rmtree
 from typing import Any, Dict, List, Tuple
 from pathlib import Path
 from uuid import uuid1
@@ -63,29 +63,54 @@ def test_bin(seed: str, args: List[str]) -> bool:
     return True
 
 
-def minimize_seeds(afl_path: str, seed_dir: str, args: List[str]) -> str:
+def minimize_seeds(
+    afl_path: str, seed_dir: str, args: List[str], output_dir: str
+) -> str:
     """
     Run optimin on the seed directory and return the minimized seed directory.
     """
     print(f"Minimizing seeds in {seed_dir}")
+
     if Path(seed_dir).name.endswith("minimized"):
         return ""
-    minimized_seed_dir_path = (
-        Path(seed_dir).with_name(f"{Path(seed_dir).name}_minimized").resolve()
-    )
-    rmtree(minimized_seed_dir_path, ignore_errors=True)
-    minimized_seed_dir_path.mkdir(parents=True, exist_ok=True)
-    minimized_seed_dir = str(minimized_seed_dir_path)
-    run(
-        f"{str(Path(afl_path).with_name('utils') / 'optimin' / 'optimin')} -Q -f -i {seed_dir} -o {minimized_seed_dir} -- {' '.join(args)}",
-        shell=True,
-        check=True,
-        env={
-            "PATH": f"{str(Path(afl_path).parent)}:{getenv('PATH')}",
-            "LD_LIBRARY_PATH": ld_library_path(args),
-        },
-    )
-    return minimized_seed_dir
+
+    if Path(seed_dir).name == "empty":
+        binary, corpus = binary_path_info(args[0])
+
+        output_seed_dir_path = (
+            Path(output_dir) / corpus / binary / (Path(seed_dir).name)
+        )
+
+        rmtree(output_seed_dir_path, ignore_errors=True)
+        output_seed_dir_path.mkdir(parents=True, exist_ok=True)
+
+        for f in Path(seed_dir).iterdir():
+            copyfile(f, output_seed_dir_path / f.name)
+
+        return str(output_seed_dir_path)
+
+    else:
+
+        binary, corpus = binary_path_info(args[0])
+
+        minimized_seed_dir_path = (
+            Path(output_dir) / corpus / binary / (Path(seed_dir).name + "_minimized")
+        )
+
+        rmtree(minimized_seed_dir_path, ignore_errors=True)
+        minimized_seed_dir_path.mkdir(parents=True, exist_ok=True)
+        minimized_seed_dir = str(minimized_seed_dir_path)
+
+        run(
+            f"{str(Path(afl_path).with_name('utils') / 'optimin' / 'optimin')} -Q -f -i {seed_dir} -o {minimized_seed_dir} -- {' '.join(args)}",
+            shell=True,
+            check=True,
+            env={
+                "PATH": f"{str(Path(afl_path).parent)}:{getenv('PATH')}",
+                "LD_LIBRARY_PATH": ld_library_path(args),
+            },
+        )
+        return minimized_seed_dir
 
 
 def run_wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> None:
@@ -217,12 +242,32 @@ if __name__ == "__main__":
 
     coreprocs = []
     outdirs = []
+    min_seed_dirs = []
     for seed_path in list(Path(parsed_args.seed_dir).iterdir()):
+        for p in seed_path.rglob("**/*"):
+            if p.is_file():
+                p.chmod(0o777)
+            elif p.is_dir():
+                p.chmod(0o777)
+
         min_seed_dir = minimize_seeds(
-            parsed_args.afl_path, str(seed_path), parsed_args.args
+            parsed_args.afl_path,
+            str(seed_path),
+            parsed_args.args,
+            parsed_args.output_dir,
         )
+
         if not min_seed_dir:
             continue
+
+        for p in Path(min_seed_dir).rglob("**/*"):
+            if p.is_file():
+                p.chmod(0o777)
+            elif p.is_dir():
+                p.chmod(0o777)
+
+        min_seed_dirs.append(min_seed_dir)
+
         cores, outdir = run_afl(
             parsed_args.afl_path,
             min_seed_dir,
@@ -284,3 +329,7 @@ if __name__ == "__main__":
     for outdir in outdirs:
         for pth in Path(outdir).rglob("**/*"):
             pth.chmod(0o755)
+
+    print("Removing minimized seeds.")
+    for min_seed_dir in min_seed_dirs:
+        rmtree(min_seed_dir)

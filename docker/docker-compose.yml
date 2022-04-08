@@ -2,14 +2,19 @@ version: '3.8'
 services:
   aflplusplus:
     build:
-      target: aflplusplus-builder-x86_64
+      target: aflplusplus-corpus
       dockerfile: ./docker/dockerfiles/Dockerfile-fuzzers
       context: ..
+    command: python3 /scripts/aflplusplus_wrapper.py -t 1 -a /AFLplusplus/afl-fuzz -s /corpus/cgc/AIS-Lite/seeds/ -o /results/ -- /corpus/cgc/AIS-Lite/AIS-Lite
     privileged: true
     volumes:
       - ../corpus/build:/corpus
       - ../scripts/:/scripts
       - ../results/:/results
+    # Remove when running at scale but good for debugging
+    stdin_open: true
+    tty: true
+
 
   symqemu:
     build:

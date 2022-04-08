@@ -517,6 +517,10 @@ RUN make distrib && \
     cd utils/optimin/ && \
     ./build_optimin.sh
 
+FROM aflplusplus-builder-x86_64 as aflplusplus-corpus
+
+COPY ./corpus/build/ /corpus/
+
 # The below is from symcc, see license in third_party/symcc-LICENSE
 FROM ubuntu:20.04 AS symqemu-builder-deps
 
