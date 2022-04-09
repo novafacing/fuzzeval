@@ -84,8 +84,8 @@ def minimize_seeds(
         rmtree(output_seed_dir_path, ignore_errors=True)
         output_seed_dir_path.mkdir(parents=True, exist_ok=True)
 
-        for f in Path(seed_dir).iterdir():
-            copyfile(f, output_seed_dir_path / f.name)
+        emptyfile = output_seed_dir_path / "empty"
+        emptyfile.touch()
 
         return str(output_seed_dir_path)
 
