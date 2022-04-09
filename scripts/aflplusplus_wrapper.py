@@ -270,6 +270,7 @@ if __name__ == "__main__":
             str(seed_path),
             parsed_args.args,
             parsed_args.output_dir,
+            parsed_args.seed_extension
         )
 
         if not min_seed_dir:
