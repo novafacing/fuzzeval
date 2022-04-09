@@ -64,7 +64,11 @@ def test_bin(seed: str, args: List[str]) -> bool:
 
 
 def minimize_seeds(
-    afl_path: str, seed_dir: str, args: List[str], output_dir: str
+    afl_path: str,
+    seed_dir: str,
+    args: List[str],
+    output_dir: str,
+    seed_extension: str = "",
 ) -> str:
     """
     Run optimin on the seed directory and return the minimized seed directory.
@@ -100,6 +104,10 @@ def minimize_seeds(
         rmtree(minimized_seed_dir_path, ignore_errors=True)
         minimized_seed_dir_path.mkdir(parents=True, exist_ok=True)
         minimized_seed_dir = str(minimized_seed_dir_path)
+
+        for seedfile in Path(seed_dir).iterdir():
+            if not seedfile.name.endswith(seed_extension):
+                seedfile.unlink()
 
         run(
             f"{str(Path(afl_path).with_name('utils') / 'optimin' / 'optimin')} -Q -f -i {seed_dir} -o {minimized_seed_dir} -- {' '.join(args)}",
@@ -228,6 +236,13 @@ if __name__ == "__main__":
         "args",
         nargs="*",
         help="Arguments to the binary to fuzz, including the binary itself ex `/path/to/binary -arg1 -arg2`",
+    )
+    parser.add_argument(
+        "-e",
+        "--seed-extension",
+        type=str,
+        default="",
+        help="Extension to use for seeds, if specified only seeds with this extension will be used.",
     )
     parsed_args = parser.parse_args()
 
