@@ -4,6 +4,13 @@ Docker configurations and setup for large-scale fuzzing for evaluation of fuzzin
 as described in Klees et. al "Evaluating Fuzz Testing" (given in
 [docs](docs/evaluating_fuzz_testing.pdf)).
 
+## IMPORTANT! System Configuration:
+
+```sh
+echo core | sudo tee /proc/sys/kernel/core_pattern
+echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+```
+
 ## Corpus
 
 The corpus is composed of the CGC dataset and the LAVA-M dataset, and the corpus

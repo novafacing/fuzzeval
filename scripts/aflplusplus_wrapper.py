@@ -58,7 +58,7 @@ def test_bin(seed: str, args: List[str]) -> bool:
                     capture_output=True,
                 )
             except CalledProcessError as e:
-                print(f"{e}: {e.stderr}")
+                print(f"{e}:\n STDOUT: {res.stdout}\nSTDERR: {res.stderr}")
                 return False
     return True
 
@@ -122,8 +122,9 @@ def run_wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> None:
         r = run(*args, **kwargs)
     except TimeoutExpired as e:
         return
-    except CalledProcessError as e:
-        print(f"{e}: {r.stderr if r is not None else ''}")
+
+    if r.returncode != 0:
+        print(f"Command {args[0]} exited with:\nSTDOUT: {r.stdout}\nSTDERR: {r.stderr}")
         return
 
 
@@ -190,7 +191,6 @@ def run_afl(
             kwargs={
                 "shell": True,
                 "capture_output": True,
-                "check": True,
                 "env": {"LD_LIBRARY_PATH": ld_library_path(args)},
             },
         )
