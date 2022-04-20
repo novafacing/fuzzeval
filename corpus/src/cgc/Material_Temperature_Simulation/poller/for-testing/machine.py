@@ -1,5 +1,6 @@
 #!/usr/bin/python2
 
+import os
 import sys
 from generator.actions import Actions
 import ctypes as ct
@@ -8,8 +9,13 @@ import random
 
 class TSim:
     def __init__(self):
+
+        root = os.getenv("CORPUS_ROOT", None)
+        if root is None:
+            raise Exception("CORPUS_ROOT environment variable not set")
+
         self.dll = ct.CDLL(
-            "../../build/challenges/Material_Temperature_Simulation/libCROMU_00029.so"
+            "build/challenges/Material_Temperature_Simulation/libCROMU_00029.so"
         )
 
         # variables for size of the material

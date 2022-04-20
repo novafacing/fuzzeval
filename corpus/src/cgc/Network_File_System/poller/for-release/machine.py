@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 from generator.actions import Actions
 from struct import *
 from random import *
@@ -26,7 +27,12 @@ class MyClass(Actions):
         self.RESP_RENAME_FAILED         = "\x05"
         self.RESP_TOO_MANY_OPEN_FILES   = "\x06"
 
-        self.dll = ct.CDLL('../../build/challenges/Network_File_System/libCROMU_00055.so')
+        root = os.getenv("CORPUS_ROOT", None)
+
+        if root is None:
+            raise Exception("CORPUS_ROOT environment variable not set")
+
+        self.dll = ct.CDLL(root + '/Network_File_System/libCROMU_00055.so')
         self.seed_prng = self.dll.cgc_seed_prng
         self.seed_prng.argtypes = [ ct.c_uint ]
         self.seed_prng.restype = None

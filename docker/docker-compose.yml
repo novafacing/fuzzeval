@@ -15,7 +15,6 @@ services:
     stdin_open: true
     tty: true
 
-
   symqemu:
     build:
       target: symqemu
@@ -37,7 +36,7 @@ services:
       target: corpus-builder
       dockerfile: ./docker/dockerfiles/Dockerfile-corpus
       context: ..
-    command: bash -c '/corpus/build.sh; /corpus/extra.sh'
+    command: bash -c '/corpus/extra.sh'
     volumes:
       - ../corpus:/corpus
       - ../scripts/:/scripts/

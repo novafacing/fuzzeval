@@ -4,6 +4,7 @@ import random
 import ctypes as ct
 import sys
 import struct
+import os
 
 def rs( length ):
 	return ''.join( random.choice( string.lowercase + string.uppercase + string.digits) for _ in range(length) )
@@ -11,7 +12,12 @@ def rs( length ):
 class CROMU00087(Actions):
 	def start(self):
 		#self.delay(100)
-		self.dll = ct.CDLL('../../build/challenges/Recipe_and_Pantry_Manager/libCROMU_00087.so')
+		root = os.getenv("CORPUS_ROOT", None)
+
+		if root is None:
+			raise Exception("CORPUS_ROOT environment variable not set")
+
+		self.dll = ct.CDLL(root + '/Recipe_and_Pantry_Manager/libCROMU_00087.so')
 		self.multiply = self.dll.cgc_multiply
 		self.multiply.argtypes = (ct.c_double, ct.c_double)
 		self.multiply.restype = ct.c_double

@@ -262,14 +262,18 @@ def main():
 
             tree = ElementTree.ElementTree(ElementTree.fromstring(xml))
 
-            writes = list(map(lambda w: w.find("data").text, tree.iter(tag="write")))
-            raw_contents = ""
-            for w in writes:
-                raw_contents += escape_decode(w)[0]
+            try:
+
+                writes = list(map(lambda w: w.find("data").text, tree.iter(tag="write")))
+                raw_contents = ""
+                for w in writes:
+                    raw_contents += escape_decode(w)[0]
 
 
-            with open(os.path.join(args.output, filename), 'w') as xml_fh:
-                xml_fh.write(raw_contents)
+                with open(os.path.join(args.output, filename), 'w') as xml_fh:
+                    xml_fh.write(raw_contents)
+            except Exception as e:
+                pass
 
     if package_fh is not None:
         package_fh.close()
