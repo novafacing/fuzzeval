@@ -3,17 +3,26 @@ AFLplusplus wrapper for fuzzing.
 """
 from argparse import ArgumentParser
 from datetime import datetime
-from os import getenv
+from os import getenv, listdir, makedirs
 from random import randint
 from re import search
-from shutil import copyfile, rmtree
+from shutil import rmtree, copytree, copyfile
 from typing import Any, Dict, List, Tuple
 from pathlib import Path
 from uuid import uuid1
-from subprocess import CalledProcessError, TimeoutExpired, run
+from subprocess import CalledProcessError, TimeoutExpired, run, call
 from multiprocessing import Process
 from time import sleep
 from tqdm import tqdm
+from json import load
+import logging
+
+l = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.FileHandler("debug.log"), logging.StreamHandler()],
+)
 
 
 def ld_library_path(args: List[str]) -> str:
@@ -88,8 +97,9 @@ def minimize_seeds(
         rmtree(output_seed_dir_path, ignore_errors=True)
         output_seed_dir_path.mkdir(parents=True, exist_ok=True)
 
-        emptyfile = output_seed_dir_path / "empty"
-        emptyfile.touch()
+        emptyfile = output_seed_dir_path / "empty.raw"
+        with open(emptyfile, "wb") as f:
+            f.write(b"\x00" * 1024)
 
         return str(output_seed_dir_path)
 
@@ -109,15 +119,19 @@ def minimize_seeds(
             if not seedfile.name.endswith(seed_extension):
                 seedfile.unlink()
 
-        run(
-            f"{str(Path(afl_path).with_name('utils') / 'optimin' / 'optimin')} -Q -f -i {seed_dir} -o {minimized_seed_dir} -- {' '.join(args)}",
-            shell=True,
-            check=True,
-            env={
-                "PATH": f"{str(Path(afl_path).parent)}:{getenv('PATH')}",
-                "LD_LIBRARY_PATH": ld_library_path(args),
-            },
-        )
+        try:
+            run(
+                f"{str(Path(afl_path).with_name('utils') / 'optimin' / 'optimin')} -Q -f -i {seed_dir} -o {minimized_seed_dir} -- {' '.join(args)}",
+                shell=True,
+                check=True,
+                env={
+                    "PATH": f"{str(Path(afl_path).parent)}:{getenv('PATH')}",
+                    "LD_LIBRARY_PATH": ld_library_path(args),
+                },
+            )
+        except CalledProcessError:
+            print("Minimizing seeds failed.. this usually indicates a broken binary..")
+            return "ERROR"
         return minimized_seed_dir
 
 
@@ -125,6 +139,7 @@ def run_wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> None:
     """
     Wrapper for run
     """
+    global count
     r = None
     try:
         r = run(*args, **kwargs)
@@ -132,8 +147,11 @@ def run_wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> None:
         return
 
     if r.returncode != 0:
-        print(f"Command {args[0]} exited with:\nSTDOUT: {r.stdout}\nSTDERR: {r.stderr}")
-        return
+        # print(f"FUZZER HAS CRASHED")
+        print(
+            f"\nCommand {args[0]} exited with:\nSTDOUT: {r.stdout}\nSTDERR: {r.stderr}\n"
+        )
+        exit(r.returncode)
 
 
 def afl_whatsup(afl_path: str, output_dir: str) -> str:
@@ -209,6 +227,10 @@ def run_afl(
     return coreprocs, output_dir
 
 
+class EarlyExitException(Exception):
+    pass
+
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument(
@@ -218,12 +240,11 @@ if __name__ == "__main__":
         "-a", "--afl-path", type=str, required=True, help="Path to afl-fuzz"
     )
     parser.add_argument(
-        "-s",
-        "--seed-dir",
+        "-i",
+        "--index",
         type=str,
-        required=False,
-        default="",
-        help="Path to the seed directory.",
+        required=True,
+        help="Kubernetes' job completion index ($JOB_COMPLETION_INDEX)",
     )
     parser.add_argument(
         "-o",
@@ -231,11 +252,6 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Path to the top-level output directory.",
-    )
-    parser.add_argument(
-        "args",
-        nargs="*",
-        help="Arguments to the binary to fuzz, including the binary itself ex `/path/to/binary -arg1 -arg2`",
     )
     parser.add_argument(
         "-e",
@@ -246,19 +262,63 @@ if __name__ == "__main__":
     )
     parsed_args = parser.parse_args()
 
-    if not parsed_args.seed_dir:
-        parsed_args.seed_dir = str(Path(parsed_args.args[0]).with_name("seeds"))
+    # ---------- PREP PHASE ----------
 
-    if not parsed_args.args:
-        raise ValueError("No arguments provided.")
+    print(f"JOB_COMPLETION_INDEX = {parsed_args.index}")
 
-    if not test_bin(parsed_args.seed_dir, parsed_args.args):
-        raise ValueError("Binary test failed.")
+    log_dir = Path("/shared/frqmod/logs/")
+    if not log_dir.exists():
+        # this is our only real failure case, this not existing usually means nothing else will work lol
+        print(f"ERROR: Failed to stat log directory '{log_dir}'\nExiting..")
+        exit(-1)
 
+    mapping_path = Path("/shared/frqmod/mappings.json")
+    if not mapping_path.exists():
+        with open(Path(f"{log_dir}/{parsed_args.index}_log_FAILED"), "w+") as log_file:
+            log_file.write(
+                f"ERROR: Unable to stat mappings file '{mapping_path}'. Did you generate it?\n"
+            )
+        exit(0)
+
+    index_to_binary = {}
+    with open(mapping_path) as f:
+        index_to_binary = load(f)
+    if not index_to_binary:
+        with open(Path(f"{log_dir}/{parsed_args.index}_log_FAILED"), "w+") as log_file:
+            log_file.write(
+                f"ERROR: Unable to parse mappings file '{mapping_path}'. Is it generated correctly?\n"
+            )
+        exit(0)
+
+    target_binary = index_to_binary[parsed_args.index].split("/")[-1]
+    print(f"Target Binary: {target_binary}")
+    targz_path = Path(f"/shared/frqmod/tars/{target_binary}.tar.gz")
+
+    if not targz_path.exists():
+        with open(Path(f"{log_dir}/{parsed_args.index}_log_FAILED"), "w+") as log_file:
+            log_file.write(
+                f"ERROR: Unable to locate binary gzip '{mapping_path}'. Does it exist?\n"
+            )
+        exit(0)
+
+    makedirs("/corpus/build/cgc/")
+    copyfile(targz_path, f"/corpus/build/cgc/{target_binary}.tar.gz")
+    call(
+        [
+            "tar",
+            "xf",
+            f"/corpus/build/cgc/{target_binary}.tar.gz",
+            "-C",
+            "/corpus/build/cgc/",
+        ]
+    )
+
+    seed_dir = Path(f"/corpus/build/cgc/{target_binary}/seeds/")
+    binary_path = f"/corpus/build/cgc/{target_binary}/{target_binary}"
     coreprocs = []
     outdirs = []
     min_seed_dirs = []
-    for seed_path in list(Path(parsed_args.seed_dir).iterdir()):
+    for seed_path in list(seed_dir.iterdir()):
         for p in seed_path.rglob("**/*"):
             if p.is_file():
                 p.chmod(0o777)
@@ -268,13 +328,24 @@ if __name__ == "__main__":
         min_seed_dir = minimize_seeds(
             parsed_args.afl_path,
             str(seed_path),
-            parsed_args.args,
+            [binary_path],
             parsed_args.output_dir,
             parsed_args.seed_extension,
         )
 
+        if min_seed_dir == "ERROR":
+            with open(
+                Path(f"{log_dir}/{parsed_args.index}_log_FAILED"), "w+"
+            ) as log_file:
+                log_file.write(
+                    f"ERROR: Binary failed to minimize seeds. Does the binary work with a generated seed?\n"
+                )
+            exit(0)
+
         if not min_seed_dir:
             continue
+        else:
+            print(listdir(min_seed_dir))
 
         for p in Path(min_seed_dir).rglob("**/*"):
             if p.is_file():
@@ -289,31 +360,22 @@ if __name__ == "__main__":
             min_seed_dir,
             parsed_args.output_dir,
             parsed_args.timeout,
-            parsed_args.args,
+            [binary_path],
         )
         coreprocs.extend(cores)
         outdirs.append(outdir)
 
-    sleep(5)
-
-    bars = list(
-        map(
-            lambda o: tqdm(desc=f"{o[1]}", position=o[0] + 1),
-            zip(range(len(outdirs)), outdirs),
-        )
-    )
-
+    sleep(10)
+    crashed_count = 0
     try:
-        for _ in tqdm(
-            range(parsed_args.timeout * 60),
-            desc="Waiting for fuzzers to finish",
-            position=0,
-            unit="s",
-        ):
+        for i in range(parsed_args.timeout * 60):
             ncoreprocs = []
             for p in coreprocs:
                 if not p.is_alive():
-                    print(f"Fuzzer core exited: {p.pid}")
+                    print(f"Fuzzer core exited: {p.pid} EXIT CODE: {p.exitcode}")
+                    if p.exitcode != 0:
+                        crashed_count += 1
+                        print(f"FUZZER CRASHED. CRASH COUNT: {crashed_count}")
                     coreprocs.remove(p)
                     if not coreprocs:
                         print("All fuzzer cores exited.")
@@ -321,11 +383,15 @@ if __name__ == "__main__":
                 else:
                     ncoreprocs.append(p)
 
-            for outdir, bar in zip(outdirs, bars):
-                whatsup_res = afl_whatsup(parsed_args.afl_path, outdir)
-                speed = int(search(r"Cumulative speed : (\d+)", whatsup_res).group(1))
-                bar.update(speed)
+            if crashed_count == 8:
+                # okay we have no fuzzers alive
+                raise EarlyExitException
 
+            # perform a one time check at 5%
+            if i == int(parsed_args.timeout * 60 * 0.05):
+                print("onetime check for fuzzer crash..", i)
+                if not ncoreprocs:
+                    raise EarlyExitException
             coreprocs = ncoreprocs
             sleep(1)
     except KeyboardInterrupt:
@@ -334,6 +400,11 @@ if __name__ == "__main__":
         )
         for p in coreprocs:
             p.terminate()
+    except EarlyExitException:
+        print("All the fuzzers crashed..")
+        with open(Path(f"{log_dir}/{parsed_args.index}_log_FAILED"), "w+") as log_file:
+            log_file.write(f"ERROR: ALL FUZZERS DIED. {target_binary}\n")
+        exit(0)
 
     print("Timeout finished. Waiting for fuzzers to exit. Please don't CTRL+C!")
 
@@ -349,3 +420,16 @@ if __name__ == "__main__":
     print("Removing minimized seeds.")
     for min_seed_dir in min_seed_dirs:
         rmtree(min_seed_dir)
+
+    sleep(5)
+    print(["tar", "-cf", f"{parsed_args.index}_{target_binary}.tar.gz", "/results"])
+    print(
+        ["cp", f"{parsed_args.index}_{target_binary}.tar.gz", "/shared/frqmod/results/"]
+    )
+    call(["tar", "-cf", f"{parsed_args.index}_{target_binary}.tar.gz", "/results"])
+    call(
+        ["cp", f"{parsed_args.index}_{target_binary}.tar.gz", "/shared/frqmod/results/"]
+    )
+
+    with open(Path(f"{log_dir}/{parsed_args.index}_log_SUCCEEDED"), "w+") as log_file:
+        log_file.write(f"{target_binary}\n")

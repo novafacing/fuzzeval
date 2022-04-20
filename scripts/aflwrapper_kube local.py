@@ -3,17 +3,18 @@ AFLplusplus wrapper for fuzzing.
 """
 from argparse import ArgumentParser
 from datetime import datetime
-from os import getenv
+from os import getenv, listdir
 from random import randint
 from re import search
 from shutil import copyfile, rmtree
 from typing import Any, Dict, List, Tuple
 from pathlib import Path
 from uuid import uuid1
-from subprocess import CalledProcessError, TimeoutExpired, run
+from subprocess import CalledProcessError, TimeoutExpired, run, call
 from multiprocessing import Process
 from time import sleep
 from tqdm import tqdm
+from json import load
 
 
 def ld_library_path(args: List[str]) -> str:
@@ -88,8 +89,9 @@ def minimize_seeds(
         rmtree(output_seed_dir_path, ignore_errors=True)
         output_seed_dir_path.mkdir(parents=True, exist_ok=True)
 
-        emptyfile = output_seed_dir_path / "empty"
-        emptyfile.touch()
+        emptyfile = output_seed_dir_path / "empty.raw"
+        with open(emptyfile, "wb") as f:
+            f.write(b"\x00")
 
         return str(output_seed_dir_path)
 
@@ -109,15 +111,19 @@ def minimize_seeds(
             if not seedfile.name.endswith(seed_extension):
                 seedfile.unlink()
 
-        run(
-            f"{str(Path(afl_path).with_name('utils') / 'optimin' / 'optimin')} -Q -f -i {seed_dir} -o {minimized_seed_dir} -- {' '.join(args)}",
-            shell=True,
-            check=True,
-            env={
-                "PATH": f"{str(Path(afl_path).parent)}:{getenv('PATH')}",
-                "LD_LIBRARY_PATH": ld_library_path(args),
-            },
-        )
+        try:
+            run(
+                f"{str(Path(afl_path).with_name('utils') / 'optimin' / 'optimin')} -Q -f -i {seed_dir} -o {minimized_seed_dir} -- {' '.join(args)}",
+                shell=True,
+                check=True,
+                env={
+                    "PATH": f"{str(Path(afl_path).parent)}:{getenv('PATH')}",
+                    "LD_LIBRARY_PATH": ld_library_path(args),
+                },
+            )
+        except CalledProcessError:
+            print("Minimizing seeds failed.. no minimizing will happen.")
+            call(["cp", "-r", f"{seed_dir}", f"{minimized_seed_dir}"])
         return minimized_seed_dir
 
 
@@ -218,12 +224,11 @@ if __name__ == "__main__":
         "-a", "--afl-path", type=str, required=True, help="Path to afl-fuzz"
     )
     parser.add_argument(
-        "-s",
-        "--seed-dir",
+        "-i",
+        "--index",
         type=str,
-        required=False,
-        default="",
-        help="Path to the seed directory.",
+        required=True,
+        help="Kubernetes' job completion index ($JOB_COMPLETION_INDEX)",
     )
     parser.add_argument(
         "-o",
@@ -232,11 +237,11 @@ if __name__ == "__main__":
         required=True,
         help="Path to the top-level output directory.",
     )
-    parser.add_argument(
-        "args",
-        nargs="*",
-        help="Arguments to the binary to fuzz, including the binary itself ex `/path/to/binary -arg1 -arg2`",
-    )
+    # parser.add_argument(
+    #     "args",
+    #     nargs="*",
+    #     help="Arguments to the binary to fuzz, NOT including the binary itself ex `-arg1 -arg2`",
+    # )
     parser.add_argument(
         "-e",
         "--seed-extension",
@@ -246,35 +251,62 @@ if __name__ == "__main__":
     )
     parsed_args = parser.parse_args()
 
-    if not parsed_args.seed_dir:
-        parsed_args.seed_dir = str(Path(parsed_args.args[0]).with_name("seeds"))
+    # if not parsed_args.seed_dir:
+    #     parsed_args.seed_dir = str(Path(parsed_args.args[0]).with_name("seeds"))
 
-    if not parsed_args.args:
-        raise ValueError("No arguments provided.")
+    # if not parsed_args.args:
+    #     raise ValueError("No arguments provided.")
 
-    if not test_bin(parsed_args.seed_dir, parsed_args.args):
-        raise ValueError("Binary test failed.")
+    # if not test_bin(parsed_args.seed_dir, parsed_args.args):
+    #     raise ValueError("Binary test failed.")
 
+    # translate job completion index to binary
+    print(f"JOB_COMPLETION_INDEX = {parsed_args.index}")
+    mapping_path = Path("/shared/corpus/build/mappings.json")
+    if not mapping_path.exists():
+        print(
+            f"ERROR: Mappings file '{mapping_path}' not found. Did you generate it?\nExiting.."
+        )
+        exit(-1)
+
+    index_to_binary = {}
+    with open(mapping_path) as f:
+        index_to_binary = load(f)
+    if not index_to_binary:
+        print(f"ERROR: Error reading mappings file '{mapping_path}'.")
+        exit(-1)
+
+    target_binary = index_to_binary[parsed_args.index].split("/")[-1]
+
+    seed_dir = Path(f"/shared/corpus/build/cgc/{target_binary}/seeds/")
+    binary_path = f"/shared/corpus/build/cgc/{target_binary}/{target_binary}"
+    print(f"Target Binary: {target_binary} - {binary_path}")
     coreprocs = []
     outdirs = []
     min_seed_dirs = []
-    for seed_path in list(Path(parsed_args.seed_dir).iterdir()):
+    for seed_path in list(seed_dir.iterdir()):
         for p in seed_path.rglob("**/*"):
             if p.is_file():
                 p.chmod(0o777)
             elif p.is_dir():
                 p.chmod(0o777)
 
+        # print(
+        #     f"minimize_seeds({parsed_args.afl_path}, {str(seed_path)}, {[binary_path]}, {parsed_args.output_dir}, {parsed_args.seed_extension})"
+        # )
+
         min_seed_dir = minimize_seeds(
             parsed_args.afl_path,
             str(seed_path),
-            parsed_args.args,
+            [binary_path],
             parsed_args.output_dir,
             parsed_args.seed_extension,
         )
 
         if not min_seed_dir:
             continue
+        else:
+            print(listdir(min_seed_dir))
 
         for p in Path(min_seed_dir).rglob("**/*"):
             if p.is_file():
@@ -289,7 +321,7 @@ if __name__ == "__main__":
             min_seed_dir,
             parsed_args.output_dir,
             parsed_args.timeout,
-            parsed_args.args,
+            [binary_path],
         )
         coreprocs.extend(cores)
         outdirs.append(outdir)
@@ -349,3 +381,10 @@ if __name__ == "__main__":
     print("Removing minimized seeds.")
     for min_seed_dir in min_seed_dirs:
         rmtree(min_seed_dir)
+
+    sleep(10)
+    call(["cp", "-r", "/results", "/shared/"])
+    # print("RESULTS:\n\n\n")
+    # for outdir in outdirs:
+    #     for pth in Path(outdir).rglob("**/*"):
+    #         print(pth)

@@ -5,7 +5,7 @@ services:
       target: aflplusplus-corpus
       dockerfile: ./docker/dockerfiles/Dockerfile-fuzzers
       context: ..
-    command: python3 /scripts/aflplusplus_wrapper.py -t 1 -a /AFLplusplus/afl-fuzz -s /corpus/test_fuzzers_work/AIS-Lite/seeds/ -o /results/ -- /corpus/test_fuzzers_work/AIS-Lite/AIS-Lite
+    #command: python3 aflwrapper_kube.py -t 5 -a /AFLplusplus/afl-fuzz -i ${JOB_COMPLETION_INDEX} -o /results/ -e .raw
     privileged: true
     volumes:
       - ../corpus/build:/corpus
@@ -14,7 +14,6 @@ services:
     # Remove when running at scale but good for debugging
     stdin_open: true
     tty: true
-
 
   symqemu:
     build:
