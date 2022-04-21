@@ -20,64 +20,87 @@
 #
 
 import ctypes
+import os
 
 from os.path import dirname, abspath, join
 
+
 class Image(ctypes.Structure):
     _pack_ = 1
-    _fields_ = [('width', ctypes.c_uint),
-                ('height', ctypes.c_uint),
-                ('data', ctypes.c_ubyte * (3 * 40 * 40))]
+    _fields_ = [
+        ("width", ctypes.c_uint),
+        ("height", ctypes.c_uint),
+        ("data", ctypes.c_ubyte * (3 * 40 * 40)),
+    ]
+
 
 class Chunk(ctypes.Structure):
     pass
 
+
 class Pool(ctypes.Structure):
-    _fields_ = [('size', ctypes.c_size_t),
-                ('head', ctypes.POINTER(Chunk))]
+    _fields_ = [("size", ctypes.c_size_t), ("head", ctypes.POINTER(Chunk))]
+
 
 class Vector(ctypes.Structure):
-    _fields_ = [('x', ctypes.c_double),
-                ('y', ctypes.c_double),
-                ('z', ctypes.c_double)]
+    _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double), ("z", ctypes.c_double)]
+
 
 class Ray(ctypes.Structure):
-    _fields_ = [('origin', Vector),
-                ('direction', Vector)]
+    _fields_ = [("origin", Vector), ("direction", Vector)]
+
 
 class Shape(ctypes.Structure):
     pass
 
-Shape._fields_ = [('next', ctypes.POINTER(Shape)),
-                  ('type', ctypes.c_int),
-                  ('material', ctypes.c_int),
-                  ('position', Vector),
-                  ('color', Vector),
-                  ('emission', Vector)]
+
+Shape._fields_ = [
+    ("next", ctypes.POINTER(Shape)),
+    ("type", ctypes.c_int),
+    ("material", ctypes.c_int),
+    ("position", Vector),
+    ("color", Vector),
+    ("emission", Vector),
+]
+
 
 class Sphere(ctypes.Structure):
-    _fields_ = [('shape', Shape),
-                ('data', ctypes.c_size_t),
-                ('radius', ctypes.c_float),
-                ('intersect', ctypes.c_size_t),
-                ('id', ctypes.c_uint)]
+    _fields_ = [
+        ("shape", Shape),
+        ("data", ctypes.c_size_t),
+        ("radius", ctypes.c_float),
+        ("intersect", ctypes.c_size_t),
+        ("id", ctypes.c_uint),
+    ]
+
 
 class Plane(ctypes.Structure):
-    _fields_ = [('shape', Shape),
-                ('normal', Vector),
-                ('data', ctypes.c_size_t),
-                ('intersect', ctypes.c_size_t),
-                ('id', ctypes.c_uint)]
+    _fields_ = [
+        ("shape", Shape),
+        ("normal", Vector),
+        ("data", ctypes.c_size_t),
+        ("intersect", ctypes.c_size_t),
+        ("id", ctypes.c_uint),
+    ]
+
 
 class PTCtx(ctypes.Structure):
-    _fields_ = [('pool', Pool),
-                ('camera', Ray),
-                ('fov', ctypes.c_double),
-                ('head', ctypes.POINTER(Shape))]
+    _fields_ = [
+        ("pool", Pool),
+        ("camera", Ray),
+        ("fov", ctypes.c_double),
+        ("head", ctypes.POINTER(Shape)),
+    ]
+
 
 class Support(object):
     def __init__(self, magic_page):
-        path = join(dirname(dirname(abspath(__file__))), '../../build', 'challenges', 'PTaaS', 'libNRFIN_00054.so')
+        root = os.getenv("CORPUS_ROOT", None)
+
+        if root is None:
+            raise Exception("CORPUS_ROOT environment variable not set")
+
+        path = join(root, "build", "challenges", "PTaaS", "libNRFIN_00054.so")
         self.lib = ctypes.cdll.LoadLibrary(path)
 
         self.lib.cgc_strtod.restype = ctypes.c_double
@@ -111,8 +134,14 @@ class Support(object):
 
         # Need to do this manually so as not to call allocate
         sphere = Sphere()
-        self.lib.cgc_shape_init(ctypes.pointer(sphere), ctypes.c_int(0), ctypes.c_int(material),
-                position, color, emission)
+        self.lib.cgc_shape_init(
+            ctypes.pointer(sphere),
+            ctypes.c_int(0),
+            ctypes.c_int(material),
+            position,
+            color,
+            emission,
+        )
         self.lib.cgc_sphere_init(ctypes.pointer(sphere), radius)
 
         sphere.shape.next = self.ctx.head
@@ -130,8 +159,14 @@ class Support(object):
 
         # Need to do this manually so as not to call allocate
         plane = Plane()
-        self.lib.cgc_shape_init(ctypes.pointer(plane), ctypes.c_int(1), ctypes.c_int(material),
-                position, color, emission)
+        self.lib.cgc_shape_init(
+            ctypes.pointer(plane),
+            ctypes.c_int(1),
+            ctypes.c_int(material),
+            position,
+            color,
+            emission,
+        )
         self.lib.cgc_plane_init(ctypes.pointer(plane), normal)
 
         plane.shape.next = self.ctx.head
@@ -147,10 +182,10 @@ class Support(object):
     def render(self):
         self.lib.cgc_pt_render(ctypes.pointer(self.ctx), ctypes.pointer(self.img))
 
-        ret = '40 40\n'
+        ret = "40 40\n"
         for i in self.img.data:
-            ret += '%s ' % i
-        ret += '\n'
+            ret += "%s " % i
+        ret += "\n"
 
         return ret
 
@@ -174,4 +209,3 @@ class Support(object):
 
     def make_ray(self, o, d):
         return self.lib.cgc_make_ray(o, d)
-

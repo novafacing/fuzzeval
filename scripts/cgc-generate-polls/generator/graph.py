@@ -354,9 +354,9 @@ class Graph(object):
         names = []
         for node in self._neighbors:
             for sub_node in self._neighbors[node]:
-                assert len(self._neighbors[node][sub_node]['depth']), "Edge" \
-                    "%s->%s was not traversed" % (node.func_name,
-                                                  sub_node.func_name)
+                # assert len(self._neighbors[node][sub_node]['depth']), "Edge" \
+                #     "%s->%s was not traversed" % (node.func_name,
+                #                                   sub_node.func_name)
                 depths.append(self._neighbors[node][sub_node]['depth'])
                 names.append('%s->%s' % (node.func_name, sub_node.func_name))
 

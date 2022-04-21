@@ -23,7 +23,7 @@ class MyClass(Actions):
             raise Exception("CORPUS_ROOT not set")
 
         # setup ctypes for prng functions
-        self.dll = ct.CDLL("build/challenges/Lazybox/libCROMU_00051.so")
+        self.dll = ct.CDLL(root + "/Lazybox/libCROMU_00051.so")
         self.seed_prng = self.dll.cgc_seed_prng
         self.seed_prng.argtypes = [ct.c_uint]
         self.seed_prng.restype = None

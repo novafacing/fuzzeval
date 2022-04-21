@@ -14,9 +14,7 @@ class TSim:
         if root is None:
             raise Exception("CORPUS_ROOT environment variable not set")
 
-        self.dll = ct.CDLL(
-            "build/challenges/Material_Temperature_Simulation/libCROMU_00029.so"
-        )
+        self.dll = ct.CDLL(root + "/Material_Temperature_Simulation/libCROMU_00029.so")
 
         # variables for size of the material
         self.X = ct.c_uint32.in_dll(self.dll, "cgc_X")

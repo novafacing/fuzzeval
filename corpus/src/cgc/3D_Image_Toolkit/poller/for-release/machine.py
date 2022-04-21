@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 from generator.actions import Actions
 import random
 import string
@@ -43,7 +44,10 @@ class Poller(Actions):
         self.count = 0
 
         # setup ctypes for prng functions
-        self.dll = CDLL("build/challenges/3D_Image_Toolkit/libCROMU_00078.so")
+        root = os.getenv("CORPUS_ROOT", None)
+        if root is None:
+            raise Exception("CORPUS_ROOT environment variable not set")
+        self.dll = CDLL(root + "/3D_Image_Toolkit/libCROMU_00078.so")
         self.seed_prng = self.dll.cgc_seed_prng
         self.seed_prng.argtypes = [c_uint]
         self.seed_prng.restype = None

@@ -513,11 +513,11 @@ class MultiPassSupport(object):
 		recharge_data_fmt = 'IIBB' + str(recharge_data['vendor_location_sz']) + 's'
 
 		return struct.pack(recharge_data_fmt, 
-							recharge_data['amount'],
-							recharge_data['vendor_id'],
-							recharge_data['vendor_type'],
-							recharge_data['vendor_location_sz'],
-							recharge_data['vendor_location']
+							min(4294967295, max(0, recharge_data['amount'])),
+							min(4294967295, max(0, recharge_data['vendor_id'])),
+							min(4294967295, max(0, recharge_data['vendor_type'])),
+							min(4294967295, max(0, recharge_data['vendor_location_sz'])),
+							min(4294967295, max(0, recharge_data['vendor_location']))
 							)
 
 	def make_packet_data_purchase(self, cost):

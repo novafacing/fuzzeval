@@ -73,10 +73,10 @@ class Generator:
 
         # call to CB's CalcDelta to deal with floating point
         # inconsistencies between python and C's cgc_log() functions
-        root = os.getenv("CORPUSPUS_ROOT", None)
+        root = os.getenv("CORPUS_ROOT", None)
 
         if root is None:
-            raise Exception("CORPUSPUS_ROOT environment variable not set")
+            raise Exception("CORPUS_ROOT environment variable not set")
 
         self.dll = ct.CDLL(root + "/Network_Queuing_Simulator/libCROMU_00016.so")
         self.CalcDelta = self.dll.cgc_CalcDelta
