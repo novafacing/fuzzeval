@@ -333,8 +333,8 @@ class Graph(object):
         depths = []
         names = []
         for node in self._nodes:
-            assert len(self._nodes[node]['depth']), "node %s was never "\
-                "executed" % node.func_name
+            # assert len(self._nodes[node]['depth']), "node %s was never "\
+            #     "executed" % node.func_name
             depths.append(self._nodes[node]['depth'])
             names.append(node.func_name)
 

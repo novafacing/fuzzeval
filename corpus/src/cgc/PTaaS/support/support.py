@@ -100,7 +100,7 @@ class Support(object):
         if root is None:
             raise Exception("CORPUS_ROOT environment variable not set")
 
-        path = join(root, "build", "challenges", "PTaaS", "libNRFIN_00054.so")
+        path = join(root, "PTaaS", "libNRFIN_00054.so")
         self.lib = ctypes.cdll.LoadLibrary(path)
 
         self.lib.cgc_strtod.restype = ctypes.c_double
