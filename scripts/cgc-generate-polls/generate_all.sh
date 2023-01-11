@@ -5,8 +5,12 @@ set -e
 if [ ! -z "${1}" ]; then
     CGC_DIR="${1}"
 fi
+if [ ! -z "${2}" ]; then
+    SEED_DIR="${2}"
+fi
 
 echo "Generating CGC seeds for CGC_DIR: ${CGC_DIR}"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 find "${CGC_DIR}" -type d -path '*/poller/for-*' -mindepth 3 -maxdepth 3 -exec bash -c \
     'export BINNAME="$(printf "{}" | cut -d "/" -f4-5)"; \
@@ -15,10 +19,10 @@ find "${CGC_DIR}" -type d -path '*/poller/for-*' -mindepth 3 -maxdepth 3 -exec b
     cd "/corpus/src/${BINNAME}"; \
     export CORPUS_ROOT="/corpus/build/cgc"; \
     if [[ -f "{}/state-graph.yaml" && -f "{}/machine.py" ]]; then \
-        OUTPUT=$(python2 /scripts/cgc-generate-polls/generate-polls --count 20 --duplicate 1 --repeat 1 --store_seed \
+        OUTPUT=$(python2 $SCRIPT_DIR/generate-polls --count 20 --duplicate 1 --repeat 1 --store_seed \
         "{}/machine.py" "{}/state-graph.yaml" /corpus/build/${BINNAME}/seeds/good/ 2>&1); \
     else \
-        OUTPUT=$(python2 /scripts/cgc-generate-polls/parse-polls "{}" "/corpus/build/${BINNAME}/seeds/good/"); \
+        OUTPUT=$(python2 $SCRIPT_DIR/parse-polls "{}" "/corpus/build/${BINNAME}/seeds/good/"); \
     fi; \
     export NUMBUILT=$(ls "/corpus/build/${BINNAME}/seeds/good/" | grep -v png | grep -v dot | wc -l); \
     if [[ ${NUMBUILT} != 20 ]]; then \
